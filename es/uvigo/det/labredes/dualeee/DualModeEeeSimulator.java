@@ -39,6 +39,7 @@ public final class DualModeEeeSimulator {
     public static long max_delay_timer = (long) (64e-6 * 1e12);
     public static int fast_to_active_qth = 1;
     public static int deep_to_active_qth = 1;
+    public static String operation_mode = "dual";
  
     /**
      * Event handler.
@@ -159,11 +160,16 @@ public final class DualModeEeeSimulator {
 				printError("Config file: invalid deep sleep configuration!");
 			    }
 			} else if (line_fields[0].equals("EEE")) {
+			    if (line_fields[1].equals("dual") || line_fields[1].equals("fast") || line_fields[1].equals("deep")) {
+				operation_mode = line_fields[1];
+			    } else {
+				printError("Config file: invalid EEE operation mode!");
+			    }
 			    try {
-				fast_to_deep_timer = (long) (1e12 * Double.parseDouble(line_fields[1]));
-				max_delay_timer = (long) (1e12 * Double.parseDouble(line_fields[2]));
-				fast_to_active_qth = Integer.parseInt(line_fields[3]);
-				deep_to_active_qth = Integer.parseInt(line_fields[4]);
+				fast_to_deep_timer = (long) (1e12 * Double.parseDouble(line_fields[2]));
+				max_delay_timer = (long) (1e12 * Double.parseDouble(line_fields[3]));
+				fast_to_active_qth = Integer.parseInt(line_fields[4]);
+				deep_to_active_qth = Integer.parseInt(line_fields[5]);
 			    } catch (NumberFormatException e) {
 				printError("Config file: invalid EEE configuration!");
 			    }

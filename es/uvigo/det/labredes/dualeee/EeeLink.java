@@ -65,7 +65,7 @@ public class EeeLink {
         for (EeeState st : EeeState.values()) {
             time_in_states.put(st, (long) 0);
         }
-	state = EeeState.TRANSITION_TO_FAST;
+	state = DualModeEeeSimulator.operation_mode.equals("deep") ? EeeState.TRANSITION_TO_DEEP : EeeState.TRANSITION_TO_FAST;
         DualModeEeeSimulator.event_handler.addEvent(new StateTransitionEvent (0, "handleStateTransitionEvent", state));
 
 	frames_received = frames_sent = frames_dropped = 0;
@@ -94,13 +94,17 @@ public class EeeLink {
         DualModeEeeSimulator.event_handler.addEvent(new FrameArrivalEvent ((long) (1e12 * traffic_generator.getNextArrival()), "handleFrameArrivalEvent"));
 	if (state == EeeState.FAST_WAKE && queue_size >= DualModeEeeSimulator.fast_to_active_qth) {
 	    DualModeEeeSimulator.event_handler.addEvent(new StateTransitionEvent (event.time, "handleStateTransitionEvent", EeeState.TRANSITION_TO_ACTIVE_FROM_FAST));
-	    DualModeEeeSimulator.event_handler.removeStateTransitionEvent(EeeState.TRANSITION_TO_DEEP);
+	    if (DualModeEeeSimulator.operation_mode.equals("dual")) {
+		DualModeEeeSimulator.event_handler.removeStateTransitionEvent(EeeState.TRANSITION_TO_DEEP);
+	    }
 	} else if (state == EeeState.DEEP_SLEEP && queue_size >= DualModeEeeSimulator.deep_to_active_qth) {
 	    DualModeEeeSimulator.event_handler.addEvent(new StateTransitionEvent (event.time, "handleStateTransitionEvent", EeeState.TRANSITION_TO_ACTIVE_FROM_DEEP));
 	}	
 	if (DualModeEeeSimulator.max_delay_timer > 0 && queue_size == 1 && state != EeeState.ACTIVE) {
-	    long max_delay_event_time = event.time + DualModeEeeSimulator.max_delay_timer - DualModeEeeSimulator.deep_to_active_t;
-	    DualModeEeeSimulator.event_handler.addEvent(new StateTransitionEvent (max_delay_event_time, "handleStateTransitionEvent", EeeState.TRANSITION_TO_ACTIVE_FROM_DEEP));
+	    long to_active_t = DualModeEeeSimulator.operation_mode.equals("fast") ? DualModeEeeSimulator.fast_to_active_t : DualModeEeeSimulator.deep_to_active_t;
+	    long max_delay_event_time = event.time + DualModeEeeSimulator.max_delay_timer - to_active_t;
+	    EeeState transition_state = DualModeEeeSimulator.operation_mode.equals("fast") ? EeeState.TRANSITION_TO_ACTIVE_FROM_FAST : EeeState.TRANSITION_TO_ACTIVE_FROM_DEEP;
+	    DualModeEeeSimulator.event_handler.addEvent(new StateTransitionEvent (max_delay_event_time, "handleStateTransitionEvent", transition_state));
 	}
     }
 
@@ -140,7 +144,8 @@ public class EeeLink {
 	    long fid = ((FrameArrivalEvent) (queue.getNextEvent(false))).frame_id;
             DualModeEeeSimulator.event_handler.addEvent(new FrameTransmissionEvent (event.time + transmission_time, "handleFrameTransmissionEvent", fid));
 	} else {
-	    DualModeEeeSimulator.event_handler.addEvent(new StateTransitionEvent (event.time, "handleStateTransitionEvent", EeeState.TRANSITION_TO_FAST));
+	    EeeState transition_state = DualModeEeeSimulator.operation_mode.equals("deep") ? EeeState.TRANSITION_TO_DEEP : EeeState.TRANSITION_TO_FAST;
+	    DualModeEeeSimulator.event_handler.addEvent(new StateTransitionEvent (event.time, "handleStateTransitionEvent", transition_state));
 	}
     }
 
@@ -160,7 +165,9 @@ public class EeeLink {
 	    if (queue_size >= DualModeEeeSimulator.fast_to_active_qth) {
 		DualModeEeeSimulator.event_handler.addEvent(new StateTransitionEvent (event.time, "handleStateTransitionEvent", EeeState.TRANSITION_TO_ACTIVE_FROM_FAST));
 	    } else {
-		DualModeEeeSimulator.event_handler.addEvent(new StateTransitionEvent (event.time + DualModeEeeSimulator.fast_to_deep_timer, "handleStateTransitionEvent", EeeState.TRANSITION_TO_DEEP));
+		if (DualModeEeeSimulator.operation_mode.equals("dual")) {
+		    DualModeEeeSimulator.event_handler.addEvent(new StateTransitionEvent (event.time + DualModeEeeSimulator.fast_to_deep_timer, "handleStateTransitionEvent", EeeState.TRANSITION_TO_DEEP));
+		}
 	    }
 	} else if (event.new_state == EeeState.DEEP_SLEEP) {
 	    if (queue_size >= DualModeEeeSimulator.deep_to_active_qth) {
@@ -169,10 +176,12 @@ public class EeeLink {
 	} else if (event.new_state == EeeState.TRANSITION_TO_FAST) {
 	    DualModeEeeSimulator.event_handler.addEvent(new StateTransitionEvent (event.time + DualModeEeeSimulator.active_to_fast_t, "handleStateTransitionEvent", EeeState.FAST_WAKE));
 	} else if (event.new_state == EeeState.TRANSITION_TO_DEEP) {
-	    DualModeEeeSimulator.event_handler.addEvent(new StateTransitionEvent (event.time + DualModeEeeSimulator.fast_to_deep_t, "handleStateTransitionEvent", EeeState.DEEP_SLEEP));
+	    long to_deep_t = DualModeEeeSimulator.operation_mode.equals("dual") ? DualModeEeeSimulator.fast_to_deep_t : DualModeEeeSimulator.active_to_fast_t + DualModeEeeSimulator.fast_to_deep_t;
+	    DualModeEeeSimulator.event_handler.addEvent(new StateTransitionEvent (event.time + to_deep_t, "handleStateTransitionEvent", EeeState.DEEP_SLEEP));
 	} else if (event.new_state == EeeState.TRANSITION_TO_ACTIVE_FROM_FAST || event.new_state == EeeState.TRANSITION_TO_ACTIVE_FROM_DEEP) {
 	    if (DualModeEeeSimulator.max_delay_timer > 0) {
-		DualModeEeeSimulator.event_handler.removeStateTransitionEvent(EeeState.TRANSITION_TO_ACTIVE_FROM_DEEP);
+		EeeState transition_state = DualModeEeeSimulator.operation_mode.equals("fast") ? EeeState.TRANSITION_TO_ACTIVE_FROM_FAST : EeeState.TRANSITION_TO_ACTIVE_FROM_DEEP;
+		DualModeEeeSimulator.event_handler.removeStateTransitionEvent(transition_state);
 	    }
 	    long to_active_t = event.new_state == EeeState.TRANSITION_TO_ACTIVE_FROM_FAST ? DualModeEeeSimulator.fast_to_active_t : DualModeEeeSimulator.deep_to_active_t;
 	    DualModeEeeSimulator.event_handler.addEvent(new StateTransitionEvent (event.time + to_active_t, "handleStateTransitionEvent", EeeState.ACTIVE));
