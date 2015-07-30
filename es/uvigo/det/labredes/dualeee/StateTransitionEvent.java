@@ -48,6 +48,12 @@ public class StateTransitionEvent extends Event<EeeLink> {
      * Prints on standard output a message describing the state transition event.
      */
     public void print () {
-	System.out.format("%.3f StateTransitionEvent %s %n", time / 1e6, new_state);
+	String queue_th = "";
+	if (new_state == EeeState.FAST_WAKE) {
+	    queue_th = String.valueOf(DualModeEeeSimulator.fast_to_active_qth);
+	} else if (new_state == EeeState.DEEP_SLEEP) {
+	    queue_th = String.valueOf(DualModeEeeSimulator.deep_to_active_qth);
+	}
+	System.out.format("%.3f StateTransitionEvent %s %s%n", time / 1e6, new_state, queue_th);
     }
 }

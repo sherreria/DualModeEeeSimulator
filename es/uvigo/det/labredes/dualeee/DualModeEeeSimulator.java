@@ -3,7 +3,7 @@ package es.uvigo.det.labredes.dualeee;
 import java.io.*;
 
 /**
- * DualModeEeeSimulator: Java program that simulates a dual-mode EEE link.
+ * DualModeEeeSimulator: a Java program that simulates a dual-mode EEE link.
  *
  * @author Sergio Herreria-Alonso 
  * @version 1.0
@@ -35,10 +35,11 @@ public final class DualModeEeeSimulator {
     public static long deep_to_active_t = (long) (5.5e-6 * 1e12);
 
     /* EEE configuration parameters */
-    public static long fast_to_deep_timer = (long) (3.5e-6 * 1e12);
-    public static long max_delay_timer = (long) (64e-6 * 1e12);
+    public static long target_delay = (long) (32e-6 * 1e12);
+    public static long max_delay = (long) (128e-6 * 1e12);
     public static int fast_to_active_qth = 1;
     public static int deep_to_active_qth = 1;
+    public static long max_fast_time = (long) (3.5e-6 * 1e12);
     public static String operation_mode = "dual";
  
     /**
@@ -160,21 +161,26 @@ public final class DualModeEeeSimulator {
 				printError("Config file: invalid deep sleep configuration!");
 			    }
 			} else if (line_fields[0].equals("EEE")) {
-			    if (line_fields[1].equals("dual") || line_fields[1].equals("fast") || line_fields[1].equals("deep")) {
+			    if (line_fields[1].equals("dual") || line_fields[1].equals("fast") || line_fields[1].equals("deep") ||
+				line_fields[1].equals("fast_dyn") || line_fields[1].equals("deep_dyn")) {
 				operation_mode = line_fields[1];
 			    } else {
 				printError("Config file: invalid EEE operation mode!");
 			    }
 			    try {
-				fast_to_deep_timer = (long) (1e12 * Double.parseDouble(line_fields[2]));
-				max_delay_timer = (long) (1e12 * Double.parseDouble(line_fields[3]));
+				target_delay = (long) (1e12 * Double.parseDouble(line_fields[2]));
+				max_delay = (long) (1e12 * Double.parseDouble(line_fields[3]));
 				fast_to_active_qth = Integer.parseInt(line_fields[4]);
 				deep_to_active_qth = Integer.parseInt(line_fields[5]);
+				max_fast_time = (long) (1e12 * Double.parseDouble(line_fields[6]));
 			    } catch (NumberFormatException e) {
 				printError("Config file: invalid EEE configuration!");
 			    }
-			    if (max_delay_timer != 0 && max_delay_timer < active_to_fast_t + fast_to_deep_timer + fast_to_deep_t) {
-				printError("Config file: too low max delay timer!");
+			    if ((operation_mode.equals("fast_dyn") && target_delay < fast_to_active_t) || (operation_mode.equals("deep_dyn") && target_delay < deep_to_active_t)) {
+				printError("Config file: too low target delay!");
+			    }
+			    if (max_delay != 0 && (max_delay < active_to_fast_t + max_fast_time + fast_to_deep_t || max_delay < target_delay)) {
+				printError("Config file: too low max delay!");
 			    }
 			    if (deep_to_active_qth < fast_to_active_qth) {
 				printError("Config file: too low deep to active queue threshold!");
@@ -191,7 +197,7 @@ public final class DualModeEeeSimulator {
 	// Event handler initialization
 	event_handler = new EventList(simulation_length);
 
-	// UE and eNB initialization
+	// EEE link initialization
 	TrafficGenerator tg = null;
 	if (traffic_distribution.equals("deterministic")) {
 	    tg = new DeterministicTrafficGenerator(arrival_rate, frame_size);
