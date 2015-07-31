@@ -158,9 +158,9 @@ public class EeeLink {
 	    EeeState transition_state = DualModeEeeSimulator.operation_mode.contains("deep") ? EeeState.TRANSITION_TO_DEEP : EeeState.TRANSITION_TO_FAST;
 	    DualModeEeeSimulator.event_handler.addEvent(new StateTransitionEvent (event.time, "handleStateTransitionEvent", transition_state));
 	    if (DualModeEeeSimulator.operation_mode.equals("fast_dyn")) {
-		DualModeEeeSimulator.fast_to_active_qth = (int) ((2 * DualModeEeeSimulator.target_delay - DualModeEeeSimulator.fast_to_active_t) * avg_arrival_rate + 1);
+		DualModeEeeSimulator.fast_to_active_qth = (int) ((2 * DualModeEeeSimulator.target_delay - DualModeEeeSimulator.fast_to_active_t) * avg_arrival_rate) + 1;
 	    } else if (DualModeEeeSimulator.operation_mode.equals("deep_dyn")) {
-		DualModeEeeSimulator.deep_to_active_qth = (int) ((2 * DualModeEeeSimulator.target_delay - DualModeEeeSimulator.deep_to_active_t) * avg_arrival_rate + 1);
+		DualModeEeeSimulator.deep_to_active_qth = (int) ((2 * DualModeEeeSimulator.target_delay - DualModeEeeSimulator.deep_to_active_t) * avg_arrival_rate) + 1;
 	    }
 	}
     }
