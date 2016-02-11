@@ -162,7 +162,7 @@ public final class DualModeEeeSimulator {
 			    }
 			} else if (line_fields[0].equals("EEE")) {
 			    if (line_fields[1].equals("dual") || line_fields[1].equals("fast") || line_fields[1].equals("deep") ||
-				line_fields[1].equals("fast_dyn") || line_fields[1].equals("deep_dyn")) {
+				line_fields[1].equals("fast_dyn") || line_fields[1].equals("deep_dyn") || line_fields[1].equals("mostowfi")) {
 				operation_mode = line_fields[1];
 			    } else {
 				printError("Config file: invalid EEE operation mode!");
@@ -176,7 +176,7 @@ public final class DualModeEeeSimulator {
 			    } catch (NumberFormatException e) {
 				printError("Config file: invalid EEE configuration!");
 			    }
-			    if ((operation_mode.equals("fast_dyn") && target_delay < fast_to_active_t) || (operation_mode.equals("deep_dyn") && target_delay < deep_to_active_t)) {
+			    if ((operation_mode.equals("fast_dyn") && target_delay < fast_to_active_t / 2.0) || (operation_mode.equals("deep_dyn") && target_delay < deep_to_active_t / 2.0)) {
 				printError("Config file: too low target delay!");
 			    }
 			    if (max_delay != 0 && (max_delay < active_to_fast_t + max_fast_time + fast_to_deep_t || max_delay < target_delay)) {
