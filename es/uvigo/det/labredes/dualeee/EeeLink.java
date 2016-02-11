@@ -47,6 +47,7 @@ public class EeeLink {
     private Map<EeeState, Long> time_in_states;
     private long num_coalescing_cycles;
     private int mostowfi_queue_size;
+    private double weighted_sum_active_qth, update_time_active_qth;
 
     /**
      * Creates a new EEE link.
@@ -74,6 +75,7 @@ public class EeeLink {
 	sum_frames_delay = maximum_frame_delay = 0;
 	num_coalescing_cycles = 0;
 	prev_arrival_time = avg_arrival_rate = 0.0;
+	weighted_sum_active_qth = update_time_active_qth = 0.0;
 
 	DualModeEeeSimulator.event_handler.addEvent(new FrameArrivalEvent ((long) (1e12 * traffic_generator.getNextArrival()), "handleFrameArrivalEvent"));
     }
@@ -161,10 +163,15 @@ public class EeeLink {
 		(DualModeEeeSimulator.operation_mode.equals("mostowfi") && mostowfi_queue_size < DualModeEeeSimulator.deep_to_active_qth / 2.0) ? 
 		EeeState.TRANSITION_TO_DEEP : EeeState.TRANSITION_TO_FAST;
 	    DualModeEeeSimulator.event_handler.addEvent(new StateTransitionEvent (event.time, "handleStateTransitionEvent", transition_state));
-	    if (DualModeEeeSimulator.operation_mode.equals("fast_dyn")) {
-		DualModeEeeSimulator.fast_to_active_qth = (int) ((2 * DualModeEeeSimulator.target_delay - DualModeEeeSimulator.fast_to_active_t) * avg_arrival_rate) + 1;
-	    } else if (DualModeEeeSimulator.operation_mode.equals("deep_dyn")) {
-		DualModeEeeSimulator.deep_to_active_qth = (int) ((2 * DualModeEeeSimulator.target_delay - DualModeEeeSimulator.deep_to_active_t) * avg_arrival_rate) + 1;
+	    if (DualModeEeeSimulator.operation_mode.contains("dyn")) {
+		if (DualModeEeeSimulator.operation_mode.equals("fast_dyn")) {
+		    weighted_sum_active_qth += DualModeEeeSimulator.fast_to_active_qth * (event.time - update_time_active_qth);
+		    DualModeEeeSimulator.fast_to_active_qth = (int) ((2 * DualModeEeeSimulator.target_delay - DualModeEeeSimulator.fast_to_active_t) * avg_arrival_rate) + 1;
+		} else if (DualModeEeeSimulator.operation_mode.equals("deep_dyn")) {
+		    weighted_sum_active_qth += DualModeEeeSimulator.deep_to_active_qth * (event.time - update_time_active_qth);
+		    DualModeEeeSimulator.deep_to_active_qth = (int) ((2 * DualModeEeeSimulator.target_delay - DualModeEeeSimulator.deep_to_active_t) * avg_arrival_rate) + 1;
+		}
+		update_time_active_qth = event.time;
 	    }
 	}
     }
@@ -241,5 +248,10 @@ public class EeeLink {
 				    DualModeEeeSimulator.deep_sleep_consumption * time_in_states.get(EeeState.DEEP_SLEEP)) / DualModeEeeSimulator.simulation_length;
 	System.out.format("Power consumption: %.4f %n", power_consumption);
 	System.out.format("Average coalescing cycle: %.4f %n", DualModeEeeSimulator.simulation_length / 1e6 / num_coalescing_cycles);
+	if (DualModeEeeSimulator.operation_mode.contains("dyn")) {
+	    int active_qth = DualModeEeeSimulator.operation_mode.equals("fast_dyn") ? DualModeEeeSimulator.fast_to_active_qth : DualModeEeeSimulator.deep_to_active_qth;
+	    weighted_sum_active_qth += active_qth * (DualModeEeeSimulator.simulation_length - update_time_active_qth);
+	    System.out.format("Average coalescing queue threshold: %.4f %n", weighted_sum_active_qth / DualModeEeeSimulator.simulation_length);
+	}
     }
 }
