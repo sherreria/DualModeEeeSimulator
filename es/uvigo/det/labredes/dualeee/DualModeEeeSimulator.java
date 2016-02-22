@@ -181,7 +181,7 @@ public final class DualModeEeeSimulator {
 				(operation_mode.equals("deep_dyn") && target_delay < deep_to_active_t / 2.0)) {
 				printError("Config file: too low target delay!");
 			    }
-			    if (max_delay != 0 && (max_delay < active_to_fast_t + max_fast_time + fast_to_deep_t || max_delay < target_delay)) {
+			    if (max_delay != 0 && (max_delay < max_fast_time || max_delay < target_delay)) {
 				printError("Config file: too low max delay!");
 			    }
 			    if (deep_to_active_qth < fast_to_active_qth) {
