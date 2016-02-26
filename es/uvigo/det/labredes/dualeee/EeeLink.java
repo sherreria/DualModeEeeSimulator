@@ -191,9 +191,9 @@ public class EeeLink {
 		int active_qth = prev_transition_state == EeeState.TRANSITION_TO_FAST ? DualModeEeeSimulator.fast_to_active_qth : DualModeEeeSimulator.deep_to_active_qth;
 		weighted_sum_active_qth += active_qth * (event.time - prev_update_active_qth);
 		if (transition_state == EeeState.TRANSITION_TO_FAST) {
-		    DualModeEeeSimulator.fast_to_active_qth = (int) ((2 * DualModeEeeSimulator.target_delay - DualModeEeeSimulator.fast_to_active_t) * avg_arrival_rate) + 1;
+		    DualModeEeeSimulator.fast_to_active_qth = (int) ((2 * DualModeEeeSimulator.target_delay - DualModeEeeSimulator.fast_to_active_t) * avg_arrival_rate + 0.5) + 1;
 		} else {
-		    DualModeEeeSimulator.deep_to_active_qth = (int) ((2 * DualModeEeeSimulator.target_delay - DualModeEeeSimulator.deep_to_active_t) * avg_arrival_rate) + 1;
+		    DualModeEeeSimulator.deep_to_active_qth = (int) ((2 * DualModeEeeSimulator.target_delay - DualModeEeeSimulator.deep_to_active_t) * avg_arrival_rate + 0.5) + 1;
 		}
 		prev_transition_state = transition_state;
 		prev_update_active_qth = event.time;
