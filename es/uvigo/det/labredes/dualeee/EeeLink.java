@@ -42,7 +42,6 @@ public class EeeLink {
     // Statistics variables
     private long frames_received, frames_sent, frames_dropped;
     private long sum_frames_delay, maximum_frame_delay;
-    private double prev_arrival_time, avg_arrival_rate;
     private long last_state_transition_time;
     private Map<EeeState, Long> time_in_states;
     private long num_coalescing_cycles;
@@ -54,6 +53,8 @@ public class EeeLink {
     private EeeState prev_transition_state;
     private double delay_th, arrival_rate_th;
     private double weighted_sum_active_qth, prev_update_active_qth;
+    private double avg_arrival_rate;
+    private int frames_received_in_current_cycle;
 
     /**
      * Creates a new EEE link.
@@ -92,10 +93,11 @@ public class EeeLink {
 	frames_received = frames_sent = frames_dropped = 0;
 	sum_frames_delay = maximum_frame_delay = 0;
 	num_coalescing_cycles = 0;
-	prev_arrival_time = avg_arrival_rate = 0.0;
 	prev_transition_state = state;
 	weighted_sum_active_qth = prev_update_active_qth = 0.0;
-
+	avg_arrival_rate = 0.0;
+	frames_received_in_current_cycle = 0;
+	
 	DualModeEeeSimulator.event_handler.addEvent(new FrameArrivalEvent ((long) (1e12 * traffic_generator.getNextArrival()), "handleFrameArrivalEvent"));
     }
 
@@ -116,13 +118,7 @@ public class EeeLink {
             DualModeEeeSimulator.event_handler.addEvent(new FrameDropEvent (event.time, "handleFrameDropEvent", event.frame_id));
         }
 	if (DualModeEeeSimulator.operation_mode.contains("dyn")) {
-	    double interarrival_time = event.time - prev_arrival_time;
-	    if (avg_arrival_rate > 0) {
-		avg_arrival_rate = 1.0 / interarrival_time + Math.exp(-0.5 * interarrival_time / DualModeEeeSimulator.max_delay) * (avg_arrival_rate - 1.0 / interarrival_time);
-	    } else {
-		avg_arrival_rate = 1.0 / interarrival_time;
-	    }
-	    prev_arrival_time = event.time;
+	    frames_received_in_current_cycle++;
 	}
         DualModeEeeSimulator.event_handler.addEvent(new FrameArrivalEvent ((long) (1e12 * traffic_generator.getNextArrival()), "handleFrameArrivalEvent"));
 	if (state == EeeState.FAST_WAKE && DualModeEeeSimulator.fast_to_active_qth > 0 && queue_size >= DualModeEeeSimulator.fast_to_active_qth) {
@@ -178,9 +174,12 @@ public class EeeLink {
 	    long fid = ((FrameArrivalEvent) (queue.getNextEvent(false))).frame_id;
             DualModeEeeSimulator.event_handler.addEvent(new FrameTransmissionEvent (event.time + transmission_time, "handleFrameTransmissionEvent", fid));
 	} else {
+	    if (DualModeEeeSimulator.operation_mode.contains("dyn")) {
+		avg_arrival_rate =  frames_received_in_current_cycle / (event.time - prev_update_active_qth);
+	    }	    
 	    EeeState transition_state = DualModeEeeSimulator.operation_mode.contains("deep") || DualModeEeeSimulator.operation_mode.equals("dual_dyn") ||
 		(DualModeEeeSimulator.operation_mode.equals("mostowfi") && mostowfi_queue_size < DualModeEeeSimulator.deep_to_active_qth / 2.0) ? 
-		EeeState.TRANSITION_TO_DEEP : EeeState.TRANSITION_TO_FAST;
+		EeeState.TRANSITION_TO_DEEP : EeeState.TRANSITION_TO_FAST;	    
 	    if (DualModeEeeSimulator.operation_mode.equals("dual_dyn") && 
 		(DualModeEeeSimulator.target_delay < DualModeEeeSimulator.deep_to_active_t / 2.0 ||
 		 (DualModeEeeSimulator.target_delay < delay_th && avg_arrival_rate > arrival_rate_th))) {
@@ -197,6 +196,7 @@ public class EeeLink {
 		}
 		prev_transition_state = transition_state;
 		prev_update_active_qth = event.time;
+		frames_received_in_current_cycle = 0;
 	    }
 	}
     }
