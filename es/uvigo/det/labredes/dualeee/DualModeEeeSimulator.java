@@ -162,7 +162,8 @@ public final class DualModeEeeSimulator {
 			    }
 			} else if (line_fields[0].equals("EEE")) {
 			    if (line_fields[1].equals("dual") || line_fields[1].equals("fast") || line_fields[1].equals("deep") ||
-				line_fields[1].equals("dual_dyn") || line_fields[1].equals("fast_dyn") || line_fields[1].equals("deep_dyn") || 
+				line_fields[1].equals("dual_dyn") || line_fields[1].equals("fast_dyn") || line_fields[1].equals("deep_dyn") ||
+				line_fields[1].equals("fast_mul") || line_fields[1].equals("deep_mul") ||
 				line_fields[1].equals("mostowfi")) {
 				operation_mode = line_fields[1];
 			    } else {
