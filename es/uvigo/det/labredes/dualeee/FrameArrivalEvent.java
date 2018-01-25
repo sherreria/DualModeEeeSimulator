@@ -15,17 +15,23 @@ public class FrameArrivalEvent extends Event<EeeLink> {
      * The unique identifier of the arriving frame.
      */
     public long frame_id;
+    /**
+     * The size of the arriving frame.
+     */
+    public int frame_size;
 
     /**
      * Creates a new event representing the arrival of a new frame.
      *
      * @param t      instant at which the new frame arrives
+     * @param fsize  size of the new frame
      * @param method name of the method that handles the frame arrival
      */
-    public FrameArrivalEvent (long t, String method) {
+    public FrameArrivalEvent (long t, int fsize, String method) {
 	super(t, method);
 	frame_id = frame_counter;
 	frame_counter++;
+	frame_size = fsize;
     }
 
     /**
@@ -52,6 +58,6 @@ public class FrameArrivalEvent extends Event<EeeLink> {
      * Prints on standard output a message describing the frame arrival event.
      */
     public void print () {
-	System.out.format("%.3f FrameArrivalEvent %d %d %n", time / 1e6, frame_id, DualModeEeeSimulator.link.queue_size);
+	System.out.format("%.3f FrameArrivalEvent %d %d %d %n", time / 1e6, frame_id, frame_size, DualModeEeeSimulator.link.queue_size);
     }
 }

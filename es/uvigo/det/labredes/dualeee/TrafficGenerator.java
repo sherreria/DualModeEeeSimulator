@@ -34,7 +34,7 @@ abstract public class TrafficGenerator {
      */
     public TrafficGenerator (double rate, int size) {
 	frame_size = 8 * size;
-	frame_rate = rate / frame_size;
+	frame_rate = frame_size > 0 ? rate / frame_size : 0;
 	arrival_time = 0.0;
 	rng = new Random();
     }
@@ -45,7 +45,7 @@ abstract public class TrafficGenerator {
      * @param rate arrival rate (in b/s)
      */
     public void setArrivalRate (double rate) {
-	frame_rate = rate / frame_size;
+	frame_rate = frame_size > 0 ? rate / frame_size : 0;
     }
 
     /**
@@ -56,7 +56,7 @@ abstract public class TrafficGenerator {
     public void setFrameSize (int size) {
 	double arrival_rate = Math.round(frame_rate * frame_size);
 	frame_size = 8 * size;
-	frame_rate = arrival_rate / frame_size;
+	frame_rate = frame_size > 0 ? arrival_rate / frame_size : 0;
     }
 
     /**

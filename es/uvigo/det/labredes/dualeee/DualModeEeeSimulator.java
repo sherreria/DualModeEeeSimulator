@@ -67,9 +67,12 @@ public final class DualModeEeeSimulator {
 	// Traffic parameters
 	String traffic_distribution = "deterministic";
         double arrival_rate = 1e9; // in bits per second
+	String frame_size_distribution = "deterministic";
 	int frame_size = 1500; // in bytes
 	double alpha_pareto = 2.5; // if pareto distribution
-	String trace_file = ""; // if trace simulation
+	String traffic_file = ""; // if trace simulation
+	String fsize_file = ""; // if trace simulation
+	int frame_size_range = 0; // if uniform frame size distribution
 
 	// Arguments parsing
 	for (int i = 0; i < args.length; i++) {
@@ -122,28 +125,51 @@ public final class DualModeEeeSimulator {
 			    } else {
 				printError("Config file: invalid traffic distribution!");
 			    }
-			    if (line_fields[1].equals("trace")) {
-				trace_file = line_fields[2];
-				try {
-				    frame_size = Integer.parseInt(line_fields[3]);
-				} catch (NumberFormatException e) {
-				    printError("Config file: invalid frame size!");
-				}
+			    int offset = 0;
+			    if (traffic_distribution.equals("trace")) {
+				traffic_file = line_fields[2];
 			    } else {
 				try {
 				    arrival_rate = Double.parseDouble(line_fields[2]);
-				    frame_size = Integer.parseInt(line_fields[3]);
 				} catch (NumberFormatException e) {
-				    printError("Config file: invalid arrival rate or frame size!");
+				    printError("Config file: invalid arrival rate!");
 				}
-				if (line_fields[1].equals("pareto")) {
+				if (traffic_distribution.equals("pareto")) {
 				    try {
-					alpha_pareto = Double.parseDouble(line_fields[4]);
+					alpha_pareto = Double.parseDouble(line_fields[3]);
 				    } catch (NumberFormatException e) {
 					printError("Config file: invalid alpha pareto parameter!");
 				    }
+				    offset = 1;
 				}
-			    }			
+			    }
+			    if (line_fields[3 + offset].equals("deterministic") || line_fields[3 + offset].equals("uniform") || line_fields[3 + offset].equals("trace")) {
+				frame_size_distribution = line_fields[3 + offset];
+			    } else {
+				printError("Config file: invalid frame size distribution!");
+			    }
+			    if (frame_size_distribution.equals("trace")) {
+				fsize_file = line_fields[4 + offset];
+			    } else {
+				try {
+				    frame_size = Integer.parseInt(line_fields[4 + offset]);
+				} catch (NumberFormatException e) {
+				    printError("Config file: invalid frame size!");
+				}
+				if (frame_size <= 0) {
+				    printError("Config file: invalid frame size!");
+				}
+				if (frame_size_distribution.equals("uniform")) {
+				    try {
+					frame_size_range = Integer.parseInt(line_fields[5 + offset]);
+				    } catch (NumberFormatException e) {
+					printError("Config file: invalid frame size range!");
+				    }
+				    if (frame_size_range <= 0 || frame_size - frame_size_range/2.0 <= 0) {
+					printError("Config file: invalid frame size range!");
+				    }
+				}
+			    }
 			} else if (line_fields[0].equals("FAST")) {
 			    try {
 				fast_wake_consumption = Double.parseDouble(line_fields[1]);
@@ -209,10 +235,21 @@ public final class DualModeEeeSimulator {
 	} else if (traffic_distribution.equals("pareto")) {
 	    tg = new ParetoTrafficGenerator(arrival_rate, frame_size, alpha_pareto);
 	} else if (traffic_distribution.equals("trace")) {
-	    tg = new TraceTrafficGenerator(trace_file, frame_size);
+	    tg = new TraceTrafficGenerator(traffic_file);
 	}
 	tg.setSeed(simulation_seed);
-	link = new EeeLink(link_capacity, tg);	
+
+	FrameSizeGenerator fsg = null;
+        if (frame_size_distribution.equals("deterministic")) {
+            fsg = new DeterministicFrameSizeGenerator(frame_size);
+        } else if (frame_size_distribution.equals("uniform")) {
+	    fsg = new UniformFrameSizeGenerator(frame_size, frame_size_range);
+        } else if (frame_size_distribution.equals("trace")) {
+	    fsg = new TraceFrameSizeGenerator(fsize_file);
+        }      
+        fsg.setSeed(simulation_seed + 1);
+
+	link = new EeeLink(link_capacity, tg, fsg);	
 
 	// Events processing
 	Event event;

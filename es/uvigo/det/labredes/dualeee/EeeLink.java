@@ -19,6 +19,10 @@ public class EeeLink {
      */
     public TrafficGenerator traffic_generator;
     /**
+     * The frame size generator.
+     */
+    public FrameSizeGenerator frame_size_generator;   
+    /**
      * The transmission queue.
      */
     public EventList queue;
@@ -30,10 +34,6 @@ public class EeeLink {
      * The maximum amount of frames that can be stored in the transmission queue.
      */
     public int max_queue_size;
-    /**
-     * The time required to transmit a frame on the link.
-     */
-    public long transmission_time;
     /**
      * The link state.
      */
@@ -62,11 +62,12 @@ public class EeeLink {
      *
      * @param lc the link capacity (in b/s)
      * @param tg the traffic generator
+     * @param fsg the frame size generator
      */
-    public EeeLink (double lc, TrafficGenerator tg) {
+    public EeeLink (double lc, TrafficGenerator tg, FrameSizeGenerator fsg) {
 	capacity = lc;
 	traffic_generator = tg;
-	transmission_time = (long) (1e12 * traffic_generator.frame_size / capacity);
+	frame_size_generator = fsg;
         queue = new EventList(DualModeEeeSimulator.simulation_length);
         queue_size = max_queue_size = 0;
 
@@ -98,7 +99,7 @@ public class EeeLink {
 	avg_arrival_rate = 0.0;
 	frames_received_in_current_cycle = 0;
 	
-	DualModeEeeSimulator.event_handler.addEvent(new FrameArrivalEvent ((long) (1e12 * traffic_generator.getNextArrival()), "handleFrameArrivalEvent"));
+	DualModeEeeSimulator.event_handler.addEvent(new FrameArrivalEvent ((long) (1e12 * traffic_generator.getNextArrival()), frame_size_generator.getNextFrameSize(), "handleFrameArrivalEvent"));
     }
 
     /**
@@ -117,7 +118,7 @@ public class EeeLink {
         } else {
             DualModeEeeSimulator.event_handler.addEvent(new FrameDropEvent (event.time, "handleFrameDropEvent", event.frame_id));
         }
-        DualModeEeeSimulator.event_handler.addEvent(new FrameArrivalEvent ((long) (1e12 * traffic_generator.getNextArrival()), "handleFrameArrivalEvent"));
+        DualModeEeeSimulator.event_handler.addEvent(new FrameArrivalEvent ((long) (1e12 * traffic_generator.getNextArrival()), frame_size_generator.getNextFrameSize(), "handleFrameArrivalEvent"));
 	
 	if (DualModeEeeSimulator.operation_mode.contains("mul")) {
 	    return;
@@ -166,7 +167,7 @@ public class EeeLink {
         }
 	queue_size--;
         frames_sent++;
-        long current_frame_delay = event.time - queue.getNextEvent(true).time - transmission_time;
+        long current_frame_delay = event.time - queue.getNextEvent(true).time - event.frame_time;
         if (current_frame_delay > maximum_frame_delay) {
             maximum_frame_delay = current_frame_delay;
         }
@@ -175,8 +176,10 @@ public class EeeLink {
             event.print();
         }
 	if (queue_size > 0) {
-	    long fid = ((FrameArrivalEvent) (queue.getNextEvent(false))).frame_id;
-            DualModeEeeSimulator.event_handler.addEvent(new FrameTransmissionEvent (event.time + transmission_time, "handleFrameTransmissionEvent", fid));
+	    FrameArrivalEvent next_frame = (FrameArrivalEvent) (queue.getNextEvent(false));
+	    long fid = next_frame.frame_id;
+	    long ftime = (long) (8e12 * next_frame.frame_size / capacity);
+            DualModeEeeSimulator.event_handler.addEvent(new FrameTransmissionEvent (event.time + ftime, "handleFrameTransmissionEvent", fid, ftime));
 	} else {
 	    if (DualModeEeeSimulator.operation_mode.contains("dyn")) {
 		avg_arrival_rate =  frames_received_in_current_cycle / (event.time - prev_update_active_qth);
@@ -213,8 +216,10 @@ public class EeeLink {
     public void handleStateTransitionEvent (StateTransitionEvent event) {
 	if (event.new_state == EeeState.ACTIVE) {
 	    if (queue_size > 0) {
-		long fid = ((FrameArrivalEvent) (queue.getNextEvent(false))).frame_id;
-		DualModeEeeSimulator.event_handler.addEvent(new FrameTransmissionEvent (event.time + transmission_time, "handleFrameTransmissionEvent", fid));
+		FrameArrivalEvent next_frame = (FrameArrivalEvent) (queue.getNextEvent(false));
+		long fid = next_frame.frame_id;
+		long ftime = (long) (8e12 * next_frame.frame_size / capacity);
+		DualModeEeeSimulator.event_handler.addEvent(new FrameTransmissionEvent (event.time + ftime, "handleFrameTransmissionEvent", fid, ftime));
 		num_coalescing_cycles++;
 	    } else {
 		DualModeEeeSimulator.printError("Trying to activate the link with no packet to transmit!");
