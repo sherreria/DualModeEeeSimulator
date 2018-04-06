@@ -40,7 +40,7 @@ public class EeeLink {
     private EeeState state;
 
     // Statistics variables
-    private long frames_received, frames_sent, frames_dropped;
+    private long frames_received, frames_sent, frames_dropped, bytes_received;
     private long sum_frames_delay, maximum_frame_delay;
     private long last_state_transition_time;
     private Map<EeeState, Long> time_in_states;
@@ -91,7 +91,7 @@ public class EeeLink {
 	    EeeState.TRANSITION_TO_DEEP : EeeState.TRANSITION_TO_FAST;
         DualModeEeeSimulator.event_handler.addEvent(new StateTransitionEvent (0, "handleStateTransitionEvent", state));
 
-	frames_received = frames_sent = frames_dropped = 0;
+	frames_received = frames_sent = frames_dropped = bytes_received = 0;
 	sum_frames_delay = maximum_frame_delay = 0;
 	num_coalescing_cycles = 0;
 	prev_transition_state = state;
@@ -110,6 +110,7 @@ public class EeeLink {
      */
     public void handleFrameArrivalEvent (FrameArrivalEvent event) {
 	frames_received++;
+	bytes_received += event.frame_size;
         if (max_queue_size == 0 || queue_size + 1 <= max_queue_size) {
             queue_size++;
             queue.addEvent(event);
@@ -183,7 +184,7 @@ public class EeeLink {
             DualModeEeeSimulator.event_handler.addEvent(new FrameTransmissionEvent (event.time + ftime, "handleFrameTransmissionEvent", fid, ftime));
 	} else {
 	    if (DualModeEeeSimulator.operation_mode.contains("dyn")) {
-		avg_arrival_rate =  frames_received_in_current_cycle / (event.time - prev_update_active);
+		avg_arrival_rate =  frames_received_in_current_cycle / (event.time - prev_update_active);		
 	    }	    
 	    EeeState transition_state = DualModeEeeSimulator.operation_mode.contains("deep") || DualModeEeeSimulator.operation_mode.equals("dual_dyn") ||
 		(DualModeEeeSimulator.operation_mode.equals("mostowfi") && mostowfi_queue_size < DualModeEeeSimulator.deep_to_active_qth / 2.0) ? 
@@ -281,6 +282,8 @@ public class EeeLink {
         System.out.format("Frames: received %d sent %d dropped %d %n", frames_received, frames_sent, frames_dropped);
         if (frames_sent > 0) {
             System.out.format("Frame delay: average %.3f max %.3f %n", sum_frames_delay / 1e6 / frames_sent, maximum_frame_delay / 1e6);
+	    System.out.format("Average frame size: %.3f %n", 1.0 * bytes_received / frames_received);
+	    System.out.format("Average bit rate: %.3f %n", 8e12 * bytes_received / DualModeEeeSimulator.simulation_length);
         }
 	time_in_states.put(state, time_in_states.get(state) + DualModeEeeSimulator.simulation_length - last_state_transition_time);
         for (EeeState st : EeeState.values()) {

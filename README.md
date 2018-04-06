@@ -11,6 +11,10 @@ The simulator outputs a summary of the link statistics:
 
     - Average and maximum frame delay (in useconds)
 
+    - Average frame size (in bytes)
+
+    - Average bit rate (in b/s)
+
     - Time in each power state (in useconds)
 
     - Average power consumption (% of peak)
