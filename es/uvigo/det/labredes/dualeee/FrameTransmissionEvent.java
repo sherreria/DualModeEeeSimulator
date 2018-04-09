@@ -15,6 +15,10 @@ public class FrameTransmissionEvent extends Event<EeeLink> {
      * The time required to transmit the frame.
      */
     public long frame_time;
+    /**
+     * The time spent in the queue before being transmitted.
+     */
+    public long frame_delay;
 
     /**
      * Creates a new event representing the transmission of a frame.
@@ -28,6 +32,7 @@ public class FrameTransmissionEvent extends Event<EeeLink> {
 	super(t, method);
 	frame_id = fid;
 	frame_time = ftime;
+	frame_delay = 0;
     }
 
     /**
@@ -54,6 +59,6 @@ public class FrameTransmissionEvent extends Event<EeeLink> {
      * Prints on standard output a message describing the frame transmission event.
      */
     public void print () {
-	System.out.format("%.3f FrameTransmissionEvent %d %.3f %d %n", time / 1e6, frame_id, frame_time / 1e6, DualModeEeeSimulator.link.queue_size);
+	System.out.format("%.3f FrameTransmissionEvent %d %.3f %.3f %d %n", time / 1e6, frame_id, frame_time / 1e6, frame_delay / 1e6, DualModeEeeSimulator.link.queue_size);
     }
 }

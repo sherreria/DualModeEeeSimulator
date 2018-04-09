@@ -169,11 +169,11 @@ public class EeeLink {
         }
 	queue_size--;
         frames_sent++;
-        long current_frame_delay = event.time - queue.getNextEvent(true).time - event.frame_time;
-        if (current_frame_delay > maximum_frame_delay) {
-            maximum_frame_delay = current_frame_delay;
+        event.frame_delay = event.time - queue.getNextEvent(true).time - event.frame_time;
+        if (event.frame_delay > maximum_frame_delay) {
+            maximum_frame_delay = event.frame_delay;
         }
-        sum_frames_delay += current_frame_delay;
+        sum_frames_delay += event.frame_delay;
 	if (DualModeEeeSimulator.simulation_verbose) {
             event.print();
         }
