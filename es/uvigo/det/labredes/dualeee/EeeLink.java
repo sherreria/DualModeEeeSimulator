@@ -203,13 +203,22 @@ public class EeeLink {
 		     weighted_sum_active_max_delay += DualModeEeeSimulator.max_delay * (event.time - prev_update_active);
 		     DualModeEeeSimulator.max_delay = DualModeEeeSimulator.target_delay - w0 + (long) (Math.sqrt(1 + Math.pow(1 + avg_arrival_rate * (DualModeEeeSimulator.target_delay - w0), 2)) / avg_arrival_rate);
 		     DualModeEeeSimulator.max_delay -= transition_state == EeeState.TRANSITION_TO_FAST ? DualModeEeeSimulator.fast_to_active_t : DualModeEeeSimulator.deep_to_active_t;
+		     if (DualModeEeeSimulator.max_delay < 1.0/avg_arrival_rate) {
+			 DualModeEeeSimulator.max_delay = (long) (1.0/avg_arrival_rate);
+		     }
 		} else {
 		    int active_qth = prev_transition_state == EeeState.TRANSITION_TO_FAST ? DualModeEeeSimulator.fast_to_active_qth : DualModeEeeSimulator.deep_to_active_qth;
 		    weighted_sum_active_qth += active_qth * (event.time - prev_update_active);
 		    if (transition_state == EeeState.TRANSITION_TO_FAST) {
 			DualModeEeeSimulator.fast_to_active_qth = (int) (2 * avg_arrival_rate * (DualModeEeeSimulator.target_delay - w0 - DualModeEeeSimulator.fast_to_active_t/2)) + 3;
+			if (DualModeEeeSimulator.fast_to_active_qth < 1) {
+			    DualModeEeeSimulator.fast_to_active_qth = 1;
+			}
 		    } else {
 			DualModeEeeSimulator.deep_to_active_qth = (int) (2 * avg_arrival_rate * (DualModeEeeSimulator.target_delay - w0 - DualModeEeeSimulator.deep_to_active_t/2)) + 3;
+			if (DualModeEeeSimulator.deep_to_active_qth < 1) {
+			    DualModeEeeSimulator.deep_to_active_qth = 1;
+			}
 		    }
 		}
 		prev_transition_state = transition_state;
