@@ -1,7 +1,7 @@
 package es.uvigo.det.labredes.dualeee;
 
 /**
- * This class extends TrafficGenerator class to simulate Poisson traffic.
+ * This class extends TrafficGenerator class to simulate Poisson arrivals.
  *
  * @author Sergio Herreria-Alonso 
  * @version 1.0
@@ -23,8 +23,7 @@ public class PoissonTrafficGenerator extends TrafficGenerator {
      * @return instant at which the next frame arrives (in seconds)
      */
     public double getNextArrival () {
-	double rand = rng.nextDouble();
-	arrival_time += -1.0 * Math.log(rand) / frame_rate;
+	arrival_time -= Math.log(rng.nextDouble()) / frame_rate;
 	return arrival_time;
     }    
 }

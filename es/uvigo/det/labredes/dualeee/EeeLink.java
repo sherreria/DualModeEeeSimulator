@@ -13,7 +13,7 @@ public class EeeLink {
     /**
      * The link capacity.
      */
-    public double capacity;
+    public long capacity;
     /**
      * The traffic generator.
      */
@@ -23,19 +23,19 @@ public class EeeLink {
      */
     public FrameSizeGenerator frame_size_generator;   
     /**
-     * The transmission queue.
+     * The transmission buffer.
      */
     public EventList queue;
     /**
-     * The amount of frames stored in the transmission queue.
+     * The current amount of frames queued in the transmission buffer.
      */
     public int queue_size;
     /**
-     * The maximum amount of frames that can be stored in the transmission queue.
+     * The maximum amount of frames that can be queued in the transmission buffer.
      */
     public int max_queue_size;
     /**
-     * The link state.
+     * The current link state.
      */
     private EeeState state;
 
@@ -53,18 +53,17 @@ public class EeeLink {
     private EeeState prev_transition_state;
     private double delay_th, arrival_rate_th;
     private double weighted_sum_active_qth, weighted_sum_active_max_delay, prev_update_active;
-    private double avg_arrival_rate, avg_frame_size;
     private int frames_received_in_current_cycle, bytes_received_in_current_cycle;
 
     /**
      * Creates a new EEE link.
-     * The traffic is simulated with the specified traffic generator.
+     * Data traffic is simulated with the specified traffic and frame size generators.
      *
-     * @param lc the link capacity (in b/s)
-     * @param tg the traffic generator
+     * @param lc  the link capacity (in b/s)
+     * @param tg  the traffic generator
      * @param fsg the frame size generator
      */
-    public EeeLink (double lc, TrafficGenerator tg, FrameSizeGenerator fsg) {
+    public EeeLink (long lc, TrafficGenerator tg, FrameSizeGenerator fsg) {
 	capacity = lc;
 	traffic_generator = tg;
 	frame_size_generator = fsg;
@@ -78,26 +77,25 @@ public class EeeLink {
         }
 
 	if (DualModeEeeSimulator.operation_mode.equals("dual_dyn")) {
-	    double c = (1.0 - DualModeEeeSimulator.deep_sleep_consumption)/(1.0 - DualModeEeeSimulator.fast_wake_consumption);
-	    double a = c * (DualModeEeeSimulator.active_to_fast_t + DualModeEeeSimulator.fast_to_deep_t) * DualModeEeeSimulator.fast_to_active_t - 
-		DualModeEeeSimulator.active_to_fast_t * DualModeEeeSimulator.deep_to_active_t;
-	    double b = DualModeEeeSimulator.deep_to_active_t - DualModeEeeSimulator.active_to_fast_t + 
-		c * (DualModeEeeSimulator.active_to_fast_t + DualModeEeeSimulator.fast_to_deep_t - DualModeEeeSimulator.fast_to_active_t);
+	    double c = (1 - DualModeEeeSimulator.deep_sleep_consumption) / (1 - DualModeEeeSimulator.fast_wake_consumption);
+	    double a = c * (DualModeEeeSimulator.active_to_fast_t + DualModeEeeSimulator.fast_to_deep_t) * DualModeEeeSimulator.fast_to_active_t;
+	    a -= DualModeEeeSimulator.active_to_fast_t * DualModeEeeSimulator.deep_to_active_t;
+	    double b = DualModeEeeSimulator.deep_to_active_t - DualModeEeeSimulator.active_to_fast_t;
+	    b += c * (DualModeEeeSimulator.active_to_fast_t + DualModeEeeSimulator.fast_to_deep_t - DualModeEeeSimulator.fast_to_active_t);
 	    delay_th = DualModeEeeSimulator.deep_to_active_t / 2.0 + a / (Math.sqrt(b*b-4*a*(1-c)) - b);
-	    arrival_rate_th = 1.0 / (DualModeEeeSimulator.deep_to_active_t - 2.0 * DualModeEeeSimulator.target_delay + 2.0 * a / (Math.sqrt(b*b-4*a*(1-c)) - b));
+	    arrival_rate_th = 1 / (DualModeEeeSimulator.deep_to_active_t - 2 * DualModeEeeSimulator.target_delay + 2 * a / (Math.sqrt(b*b-4*a*(1-c)) - b));
 	}
 
 	state = DualModeEeeSimulator.operation_mode.contains("deep") || (DualModeEeeSimulator.operation_mode.equals("dual_dyn") && DualModeEeeSimulator.target_delay > delay_th) ? 
 	    EeeState.TRANSITION_TO_DEEP : EeeState.TRANSITION_TO_FAST;
+	prev_transition_state = state;
         DualModeEeeSimulator.event_handler.addEvent(new StateTransitionEvent (0, "handleStateTransitionEvent", state));
 
 	frames_received = frames_sent = frames_dropped = bytes_received = 0;
 	sum_frames_delay = maximum_frame_delay = 0;
 	num_coalescing_cycles = 0;
-	prev_transition_state = state;
 	weighted_sum_active_qth = weighted_sum_active_max_delay = 0.0;
 	prev_update_active = 0.0;  
-	avg_arrival_rate = 0.0;
 	frames_received_in_current_cycle = bytes_received_in_current_cycle = 0;
 	
 	DualModeEeeSimulator.event_handler.addEvent(new FrameArrivalEvent ((long) (1e12 * traffic_generator.getNextArrival()), frame_size_generator.getNextFrameSize(), "handleFrameArrivalEvent"));
@@ -111,7 +109,9 @@ public class EeeLink {
     public void handleFrameArrivalEvent (FrameArrivalEvent event) {
 	frames_received++;
 	bytes_received += event.frame_size;
-        if (max_queue_size == 0 || queue_size + 1 <= max_queue_size) {
+	DualModeEeeSimulator.event_handler.addEvent(new FrameArrivalEvent ((long) (1e12 * traffic_generator.getNextArrival()), frame_size_generator.getNextFrameSize(), "handleFrameArrivalEvent"));
+	
+        if (max_queue_size == 0 || queue_size < max_queue_size) {
             queue_size++;
             queue.addEvent(event);
             if (DualModeEeeSimulator.simulation_verbose) {
@@ -119,29 +119,28 @@ public class EeeLink {
             }
         } else {
             DualModeEeeSimulator.event_handler.addEvent(new FrameDropEvent (event.time, "handleFrameDropEvent", event.frame_id));
-        }
-        DualModeEeeSimulator.event_handler.addEvent(new FrameArrivalEvent ((long) (1e12 * traffic_generator.getNextArrival()), frame_size_generator.getNextFrameSize(), "handleFrameArrivalEvent"));
-	
-	if (DualModeEeeSimulator.operation_mode.contains("mul")) {
 	    return;
-	}
-	if (DualModeEeeSimulator.operation_mode.contains("dyn")) {
-	    frames_received_in_current_cycle++;
-	    bytes_received_in_current_cycle += event.frame_size;
-	}
-	if (state == EeeState.FAST_WAKE && DualModeEeeSimulator.fast_to_active_qth > 0 && queue_size >= DualModeEeeSimulator.fast_to_active_qth) {
-	    DualModeEeeSimulator.event_handler.addEvent(new StateTransitionEvent (event.time, "handleStateTransitionEvent", EeeState.TRANSITION_TO_ACTIVE_FROM_FAST));
-	    if (DualModeEeeSimulator.operation_mode.equals("dual")) {
-		DualModeEeeSimulator.event_handler.removeStateTransitionEvent(EeeState.TRANSITION_TO_DEEP);
+        }
+	
+	if (!DualModeEeeSimulator.operation_mode.contains("mul")) {
+	    if (DualModeEeeSimulator.operation_mode.contains("dyn")) {
+		frames_received_in_current_cycle++;
+		bytes_received_in_current_cycle += event.frame_size;
 	    }
-	} else if (state == EeeState.DEEP_SLEEP && DualModeEeeSimulator.deep_to_active_qth > 0 && queue_size >= DualModeEeeSimulator.deep_to_active_qth) {
-	    DualModeEeeSimulator.event_handler.addEvent(new StateTransitionEvent (event.time, "handleStateTransitionEvent", EeeState.TRANSITION_TO_ACTIVE_FROM_DEEP));
-	} else if (DualModeEeeSimulator.max_delay > 0 && queue_size == 1 && state != EeeState.ACTIVE) {
-	    if (!DualModeEeeSimulator.operation_mode.equals("mostowfi") || state == EeeState.TRANSITION_TO_DEEP || state == EeeState.DEEP_SLEEP) {
-		long max_delay_event_time = event.time + DualModeEeeSimulator.max_delay;
-		EeeState transition_state = (DualModeEeeSimulator.operation_mode.equals("dual_dyn") && prev_transition_state == EeeState.TRANSITION_TO_FAST) ||
-		    DualModeEeeSimulator.operation_mode.contains("fast") ? EeeState.TRANSITION_TO_ACTIVE_FROM_FAST : EeeState.TRANSITION_TO_ACTIVE_FROM_DEEP;
-		DualModeEeeSimulator.event_handler.addEvent(new StateTransitionEvent (max_delay_event_time, "handleStateTransitionEvent", transition_state));
+	    if (state == EeeState.FAST_WAKE && DualModeEeeSimulator.fast_to_active_qth > 0 && queue_size >= DualModeEeeSimulator.fast_to_active_qth) {
+		DualModeEeeSimulator.event_handler.addEvent(new StateTransitionEvent (event.time, "handleStateTransitionEvent", EeeState.TRANSITION_TO_ACTIVE_FROM_FAST));
+		if (DualModeEeeSimulator.operation_mode.equals("dual")) {
+		    DualModeEeeSimulator.event_handler.removeStateTransitionEvent(EeeState.TRANSITION_TO_DEEP);
+		}
+	    } else if (state == EeeState.DEEP_SLEEP && DualModeEeeSimulator.deep_to_active_qth > 0 && queue_size >= DualModeEeeSimulator.deep_to_active_qth) {
+		DualModeEeeSimulator.event_handler.addEvent(new StateTransitionEvent (event.time, "handleStateTransitionEvent", EeeState.TRANSITION_TO_ACTIVE_FROM_DEEP));
+	    } else if (DualModeEeeSimulator.max_delay > 0 && queue_size == 1 && state != EeeState.ACTIVE) {
+		if (!DualModeEeeSimulator.operation_mode.equals("mostowfi") || state == EeeState.TRANSITION_TO_DEEP || state == EeeState.DEEP_SLEEP) {
+		    EeeState transition_state = DualModeEeeSimulator.operation_mode.contains("fast") ||
+			(DualModeEeeSimulator.operation_mode.equals("dual_dyn") && prev_transition_state == EeeState.TRANSITION_TO_FAST) ?
+			EeeState.TRANSITION_TO_ACTIVE_FROM_FAST : EeeState.TRANSITION_TO_ACTIVE_FROM_DEEP;
+		    DualModeEeeSimulator.event_handler.addEvent(new StateTransitionEvent (event.time + DualModeEeeSimulator.max_delay, "handleStateTransitionEvent", transition_state));
+		}
 	    }
 	}
     }
@@ -180,31 +179,25 @@ public class EeeLink {
         }
 	if (queue_size > 0) {
 	    FrameArrivalEvent next_frame = (FrameArrivalEvent) (queue.getNextEvent(false));
-	    long fid = next_frame.frame_id;
-	    long ftime = (long) (8e12 * next_frame.frame_size / capacity);
-            DualModeEeeSimulator.event_handler.addEvent(new FrameTransmissionEvent (event.time + ftime, "handleFrameTransmissionEvent", fid, ftime));
+	    long next_frame_time = (long) (8e12 * next_frame.frame_size / capacity);
+            DualModeEeeSimulator.event_handler.addEvent(new FrameTransmissionEvent (event.time + next_frame_time, "handleFrameTransmissionEvent", next_frame.frame_id, next_frame_time));
 	} else {
-	    if (DualModeEeeSimulator.operation_mode.contains("dyn")) {
-		avg_arrival_rate =  frames_received_in_current_cycle / (event.time - prev_update_active);
-	    }	    
-	    EeeState transition_state = DualModeEeeSimulator.operation_mode.contains("deep") || DualModeEeeSimulator.operation_mode.equals("dual_dyn") ||
-		(DualModeEeeSimulator.operation_mode.equals("mostowfi") && mostowfi_queue_size < DualModeEeeSimulator.deep_to_active_qth / 2.0) ? 
-		EeeState.TRANSITION_TO_DEEP : EeeState.TRANSITION_TO_FAST;	    
-	    if (DualModeEeeSimulator.operation_mode.equals("dual_dyn") && 
-		(DualModeEeeSimulator.target_delay < DualModeEeeSimulator.deep_to_active_t / 2.0 ||
-		 (DualModeEeeSimulator.target_delay < delay_th && avg_arrival_rate > arrival_rate_th))) {
+	    EeeState transition_state = EeeState.TRANSITION_TO_DEEP;
+	    if (DualModeEeeSimulator.operation_mode.contains("fast") ||
+		(DualModeEeeSimulator.operation_mode.equals("mostowfi") && mostowfi_queue_size >= DualModeEeeSimulator.deep_to_active_qth / 2.0)) {
 		transition_state = EeeState.TRANSITION_TO_FAST;
 	    }
-	    DualModeEeeSimulator.event_handler.addEvent(new StateTransitionEvent (event.time, "handleStateTransitionEvent", transition_state));
 	    if (DualModeEeeSimulator.operation_mode.contains("dyn")) {
+		double avg_arrival_rate =  frames_received_in_current_cycle / (event.time - prev_update_active);
 		double utilization_factor =  bytes_received_in_current_cycle * 8e12 / (event.time - prev_update_active) / capacity;
-		long w0 = (long) ((1.0 + Math.pow(1.0 - utilization_factor, 2)) / (2.0 * avg_arrival_rate * (1.0 - utilization_factor)));
+		long w0 = (long) ((1 + Math.pow(1 - utilization_factor, 2)) / (2 * avg_arrival_rate * (1 - utilization_factor)));
 		if (DualModeEeeSimulator.operation_mode.contains("time")) {
 		     weighted_sum_active_max_delay += DualModeEeeSimulator.max_delay * (event.time - prev_update_active);
-		     DualModeEeeSimulator.max_delay = DualModeEeeSimulator.target_delay - w0 + (long) (Math.sqrt(1 + Math.pow(1 + avg_arrival_rate * (DualModeEeeSimulator.target_delay - w0), 2)) / avg_arrival_rate);
+		     DualModeEeeSimulator.max_delay = DualModeEeeSimulator.target_delay - w0;
+		     DualModeEeeSimulator.max_delay += (long) (Math.sqrt(1 + Math.pow(1 + avg_arrival_rate * (DualModeEeeSimulator.target_delay - w0), 2)) / avg_arrival_rate);
 		     DualModeEeeSimulator.max_delay -= transition_state == EeeState.TRANSITION_TO_FAST ? DualModeEeeSimulator.fast_to_active_t : DualModeEeeSimulator.deep_to_active_t;
-		     if (DualModeEeeSimulator.max_delay < 1.0/avg_arrival_rate) {
-			 DualModeEeeSimulator.max_delay = (long) (1.0/avg_arrival_rate);
+		     if (DualModeEeeSimulator.max_delay < 1 / avg_arrival_rate) {
+			 DualModeEeeSimulator.max_delay = (long) (1 / avg_arrival_rate);
 		     }
 		} else {
 		    int active_qth = prev_transition_state == EeeState.TRANSITION_TO_FAST ? DualModeEeeSimulator.fast_to_active_qth : DualModeEeeSimulator.deep_to_active_qth;
@@ -221,10 +214,15 @@ public class EeeLink {
 			}
 		    }
 		}
+		if ((DualModeEeeSimulator.operation_mode.equals("dual_dyn") && DualModeEeeSimulator.target_delay < DualModeEeeSimulator.deep_to_active_t / 2.0) ||
+		    (DualModeEeeSimulator.operation_mode.equals("dual_dyn") && DualModeEeeSimulator.target_delay < delay_th && avg_arrival_rate > arrival_rate_th)) {
+		    transition_state = EeeState.TRANSITION_TO_FAST;
+		}
 		prev_transition_state = transition_state;
 		prev_update_active = event.time;
 		frames_received_in_current_cycle = bytes_received_in_current_cycle = 0;
 	    }
+	    DualModeEeeSimulator.event_handler.addEvent(new StateTransitionEvent (event.time, "handleStateTransitionEvent", transition_state));
 	}
     }
 
@@ -234,53 +232,51 @@ public class EeeLink {
      * @param event the StateTransitionEvent to be handled
      */
     public void handleStateTransitionEvent (StateTransitionEvent event) {
-	if (event.new_state == EeeState.ACTIVE) {
+	if (event.next_state == EeeState.ACTIVE) {
 	    if (queue_size > 0) {
-		FrameArrivalEvent next_frame = (FrameArrivalEvent) (queue.getNextEvent(false));
-		long fid = next_frame.frame_id;
-		long ftime = (long) (8e12 * next_frame.frame_size / capacity);
-		DualModeEeeSimulator.event_handler.addEvent(new FrameTransmissionEvent (event.time + ftime, "handleFrameTransmissionEvent", fid, ftime));
 		num_coalescing_cycles++;
+		FrameArrivalEvent next_frame = (FrameArrivalEvent) (queue.getNextEvent(false));
+		long next_frame_time = (long) (8e12 * next_frame.frame_size / capacity);
+		DualModeEeeSimulator.event_handler.addEvent(new FrameTransmissionEvent (event.time + next_frame_time, "handleFrameTransmissionEvent", next_frame.frame_id, next_frame_time));
 	    } else {
 		DualModeEeeSimulator.printError("Trying to activate the link with no packet to transmit!");
 	    }
-	} else if (event.new_state == EeeState.FAST_WAKE) {
+	} else if (event.next_state == EeeState.FAST_WAKE) {
 	    if (DualModeEeeSimulator.fast_to_active_qth > 0 && queue_size >= DualModeEeeSimulator.fast_to_active_qth) {
 		DualModeEeeSimulator.event_handler.addEvent(new StateTransitionEvent (event.time, "handleStateTransitionEvent", EeeState.TRANSITION_TO_ACTIVE_FROM_FAST));
 	    } else if (DualModeEeeSimulator.operation_mode.equals("dual")) {
-		DualModeEeeSimulator.event_handler.addEvent(new StateTransitionEvent (event.time + DualModeEeeSimulator.max_fast_time, "handleStateTransitionEvent", EeeState.TRANSITION_TO_DEEP));
+		DualModeEeeSimulator.event_handler.addEvent(new StateTransitionEvent (event.time + DualModeEeeSimulator.max_fast_wake_time, "handleStateTransitionEvent", EeeState.TRANSITION_TO_DEEP));
 	    } else if (DualModeEeeSimulator.operation_mode.equals("mostowfi")) {
-		DualModeEeeSimulator.event_handler.addEvent(new StateTransitionEvent (event.time + DualModeEeeSimulator.max_fast_time, "handleStateTransitionEvent", EeeState.TRANSITION_TO_ACTIVE_FROM_FAST));
+		DualModeEeeSimulator.event_handler.addEvent(new StateTransitionEvent (event.time + DualModeEeeSimulator.max_fast_wake_time, "handleStateTransitionEvent", EeeState.TRANSITION_TO_ACTIVE_FROM_FAST));
 	    } else if (DualModeEeeSimulator.operation_mode.contains("mul")) {
 		DualModeEeeSimulator.event_handler.addEvent(new StateTransitionEvent (event.time + DualModeEeeSimulator.max_delay, "handleStateTransitionEvent", EeeState.FAST_WAKE));
 	    }
-	} else if (event.new_state == EeeState.DEEP_SLEEP) {
+	} else if (event.next_state == EeeState.DEEP_SLEEP) {
 	    if (DualModeEeeSimulator.deep_to_active_qth > 0 && queue_size >= DualModeEeeSimulator.deep_to_active_qth) {
 		DualModeEeeSimulator.event_handler.addEvent(new StateTransitionEvent (event.time, "handleStateTransitionEvent", EeeState.TRANSITION_TO_ACTIVE_FROM_DEEP));
 	    } else if (DualModeEeeSimulator.operation_mode.contains("mul")) {
 		DualModeEeeSimulator.event_handler.addEvent(new StateTransitionEvent (event.time + DualModeEeeSimulator.max_delay, "handleStateTransitionEvent", EeeState.DEEP_SLEEP));
 	    }
-	} else if (event.new_state == EeeState.TRANSITION_TO_FAST) {
+	} else if (event.next_state == EeeState.TRANSITION_TO_FAST) {
 	    DualModeEeeSimulator.event_handler.addEvent(new StateTransitionEvent (event.time + DualModeEeeSimulator.active_to_fast_t, "handleStateTransitionEvent", EeeState.FAST_WAKE));
-	} else if (event.new_state == EeeState.TRANSITION_TO_DEEP) {
-	    long to_deep_t = DualModeEeeSimulator.operation_mode.equals("dual") ? 
-		DualModeEeeSimulator.fast_to_deep_t : DualModeEeeSimulator.active_to_fast_t + DualModeEeeSimulator.fast_to_deep_t;
+	} else if (event.next_state == EeeState.TRANSITION_TO_DEEP) {
+	    long to_deep_t = DualModeEeeSimulator.operation_mode.equals("dual") ? DualModeEeeSimulator.fast_to_deep_t : DualModeEeeSimulator.active_to_fast_t + DualModeEeeSimulator.fast_to_deep_t;
 	    DualModeEeeSimulator.event_handler.addEvent(new StateTransitionEvent (event.time + to_deep_t, "handleStateTransitionEvent", EeeState.DEEP_SLEEP));
-	} else if (event.new_state == EeeState.TRANSITION_TO_ACTIVE_FROM_FAST || event.new_state == EeeState.TRANSITION_TO_ACTIVE_FROM_DEEP) {
+	} else if (event.next_state == EeeState.TRANSITION_TO_ACTIVE_FROM_FAST || event.next_state == EeeState.TRANSITION_TO_ACTIVE_FROM_DEEP) {
 	    if (DualModeEeeSimulator.max_delay > 0) {
-		DualModeEeeSimulator.event_handler.removeStateTransitionEvent(event.new_state);
+		DualModeEeeSimulator.event_handler.removeStateTransitionEvent(event.next_state);
 	    }
 	    if (DualModeEeeSimulator.operation_mode.equals("mostowfi") && queue_size == 0) {
 		DualModeEeeSimulator.event_handler.addEvent(new StateTransitionEvent (event.time, "handleStateTransitionEvent", EeeState.TRANSITION_TO_DEEP));
 	    } else {
 		mostowfi_queue_size = queue_size;
-		long to_active_t = event.new_state == EeeState.TRANSITION_TO_ACTIVE_FROM_FAST ? DualModeEeeSimulator.fast_to_active_t : DualModeEeeSimulator.deep_to_active_t;
+		long to_active_t = event.next_state == EeeState.TRANSITION_TO_ACTIVE_FROM_FAST ? DualModeEeeSimulator.fast_to_active_t : DualModeEeeSimulator.deep_to_active_t;
 		DualModeEeeSimulator.event_handler.addEvent(new StateTransitionEvent (event.time + to_active_t, "handleStateTransitionEvent", EeeState.ACTIVE));
 	    }
 	}
 
 	time_in_states.put(state, time_in_states.get(state) + event.time - last_state_transition_time);
-        state = event.new_state;
+        state = event.next_state;
         last_state_transition_time = event.time;
         if (DualModeEeeSimulator.simulation_verbose) {
             event.print();
@@ -306,16 +302,16 @@ public class EeeLink {
 				    time_in_states.get(EeeState.TRANSITION_TO_ACTIVE_FROM_FAST) + time_in_states.get(EeeState.TRANSITION_TO_ACTIVE_FROM_DEEP) + 
 				    DualModeEeeSimulator.fast_wake_consumption * time_in_states.get(EeeState.FAST_WAKE) +
 				    DualModeEeeSimulator.deep_sleep_consumption * time_in_states.get(EeeState.DEEP_SLEEP)) / DualModeEeeSimulator.simulation_length;
-	System.out.format("Power consumption: %.4f %n", power_consumption);
-	System.out.format("Average coalescing cycle: %.4f %n", DualModeEeeSimulator.simulation_length / 1e6 / num_coalescing_cycles);
+	System.out.format("Power consumption: %.3f %n", power_consumption);
+	System.out.format("Average coalescing cycle: %.3f %n", DualModeEeeSimulator.simulation_length / 1e6 / num_coalescing_cycles);
 	if (DualModeEeeSimulator.operation_mode.contains("dyn")) {
 	    if (DualModeEeeSimulator.operation_mode.contains("time")) {
 		weighted_sum_active_max_delay += DualModeEeeSimulator.max_delay * (DualModeEeeSimulator.simulation_length - prev_update_active);
-		System.out.format("Average coalescing max delay: %.4f %n", weighted_sum_active_max_delay / 1e6 / DualModeEeeSimulator.simulation_length);
+		System.out.format("Average coalescing max delay: %.3f %n", weighted_sum_active_max_delay / 1e6 / DualModeEeeSimulator.simulation_length);
 	    } else {
 		int active_qth = prev_transition_state == EeeState.TRANSITION_TO_FAST ? DualModeEeeSimulator.fast_to_active_qth : DualModeEeeSimulator.deep_to_active_qth;
 		weighted_sum_active_qth += active_qth * (DualModeEeeSimulator.simulation_length - prev_update_active);
-		System.out.format("Average coalescing queue threshold: %.4f %n", weighted_sum_active_qth / DualModeEeeSimulator.simulation_length);
+		System.out.format("Average coalescing queue threshold: %.3f %n", weighted_sum_active_qth / DualModeEeeSimulator.simulation_length);
 	    }
 	}
     }

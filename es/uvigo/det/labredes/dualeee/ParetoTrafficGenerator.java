@@ -1,7 +1,7 @@
 package es.uvigo.det.labredes.dualeee;
 
 /**
- * This class extends TrafficGenerator class to simulate Pareto traffic.
+ * This class extends TrafficGenerator class to simulate Pareto arrivals.
  *
  * @author Sergio Herreria-Alonso 
  * @version 1.0
@@ -21,7 +21,7 @@ public class ParetoTrafficGenerator extends TrafficGenerator {
      *
      * @param rate arrival rate (in b/s)
      * @param size frame size (in bytes)
-     * @param a shape parameter (alpha)
+     * @param a shape parameter
      */
     public ParetoTrafficGenerator (double rate, int size, double a) {
 	super(rate, size);
@@ -30,9 +30,9 @@ public class ParetoTrafficGenerator extends TrafficGenerator {
     }
 
     /**
-     * Sets the shape parameter (alpha) for the Pareto traffic generator.
+     * Sets the shape parameter for the Pareto traffic generator.
      *
-     * @param a shape parameter (alpha)
+     * @param a shape parameter
      */
     public void setAlpha (double a) {
 	alpha = a;
@@ -45,8 +45,7 @@ public class ParetoTrafficGenerator extends TrafficGenerator {
      * @return instant at which the next frame arrives (in seconds)
      */
     public double getNextArrival () {
-	double rand = rng.nextDouble();
-	arrival_time += xm / Math.pow(rand, 1 / alpha);	
+	arrival_time += xm / Math.pow(rng.nextDouble(), 1 / alpha);	
 	return arrival_time;
     }    
 }

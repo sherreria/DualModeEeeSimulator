@@ -1,8 +1,7 @@
 package es.uvigo.det.labredes.dualeee;
 
 /**
- * This class extends FrameSizeGenerator class assuming that frame sizes
- * follow a deterministic distribution.
+ * This class extends FrameSizeGenerator class to simulate deterministic frame sizes.
  *
  * @author Sergio Herreria-Alonso 
  * @version 1.0

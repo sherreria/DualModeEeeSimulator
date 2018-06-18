@@ -3,12 +3,15 @@ package es.uvigo.det.labredes.dualeee;
 import java.io.*;
 
 /**
- * This class extends FrameSizeGenerator class to feed the simulator with a traced file.
+ * This class extends FrameSizeGenerator class to feed the simulator with a trace file.
  *
  * @author Sergio Herreria-Alonso 
  * @version 1.0
  */
 public class TraceFrameSizeGenerator extends FrameSizeGenerator {
+    /**
+     * The trace file.
+     */
     private BufferedReader tracefile;
 
     /**

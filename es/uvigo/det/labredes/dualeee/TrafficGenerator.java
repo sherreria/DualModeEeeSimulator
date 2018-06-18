@@ -3,22 +3,22 @@ package es.uvigo.det.labredes.dualeee;
 import java.util.Random;
 
 /**
- * This class simulates the arrival of a stream of frames of fixed size.
+ * This class simulates the arrival of frames.
  *
  * @author Sergio Herreria-Alonso 
  * @version 1.0
  */
 abstract public class TrafficGenerator {
     /**
-     * The frame rate (in frames/s).
+     * The average frame rate (in frames/s).
      */
     public double frame_rate;
     /**
-     * The frame size (in bits).
+     * The average frame size (in bits).
      */
     public int frame_size;
     /**
-     * The instant at which the last frame arrived (in seconds).
+     * The instant at which the former frame arrived (in seconds).
      */
     public double arrival_time;
     /**

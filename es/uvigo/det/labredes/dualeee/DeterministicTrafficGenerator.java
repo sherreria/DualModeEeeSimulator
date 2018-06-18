@@ -1,7 +1,7 @@
 package es.uvigo.det.labredes.dualeee;
 
 /**
- * This class extends TrafficGenerator class to simulate deterministic traffic.
+ * This class extends TrafficGenerator class to simulate deterministic arrivals.
  *
  * @author Sergio Herreria-Alonso 
  * @version 1.0
@@ -23,7 +23,7 @@ public class DeterministicTrafficGenerator extends TrafficGenerator {
      * @return instant at which the next frame arrives (in seconds)
      */
     public double getNextArrival () {
-	arrival_time += 1.0 / frame_rate;
+	arrival_time += 1 / frame_rate;
 	return arrival_time;
     }
 }

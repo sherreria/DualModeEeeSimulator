@@ -87,7 +87,7 @@ public class EventList {
     }
 
     /**
-     * Invokes the method that handles the specified event on the corresponding link.
+     * Invokes the method that handles the specified event.
      *
      * @param event the Event to be handled
      */
@@ -117,18 +117,16 @@ public class EventList {
     /**
      * Removes the next state transition event from the event list. If the list does not contain the event, it is unchanged.
      *
-     * @param state the state of the StateTransitionEvent to be removed
-     * @return true if the event list contained the specified event 
+     * @param state the state of the state transition event to be removed
+     * @return true if a state transition event with the specified state is removed
      */
     public boolean removeStateTransitionEvent (EeeState state) {
 	Event event;
 	for (int i = 0; i < list.size(); i++) {
 	    event = list.get(i);
-	    if (event instanceof StateTransitionEvent) {
-		if (((StateTransitionEvent) event).new_state == state) {
-		    list.remove(i);
-		    return true;
-		}
+	    if (event instanceof StateTransitionEvent && ((StateTransitionEvent) event).next_state == state) {
+		list.remove(i);
+		return true;
 	    }
 	}
 	return false;

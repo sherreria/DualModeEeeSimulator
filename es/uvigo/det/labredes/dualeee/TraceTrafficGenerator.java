@@ -3,12 +3,15 @@ package es.uvigo.det.labredes.dualeee;
 import java.io.*;
 
 /**
- * This class extends TrafficGenerator class to feed the simulator with a traced file.
+ * This class extends TrafficGenerator class to feed the simulator with a trace file.
  *
  * @author Sergio Herreria-Alonso 
  * @version 1.0
  */
 public class TraceTrafficGenerator extends TrafficGenerator {
+    /**
+     * The trace file.
+     */
     private BufferedReader tracefile;
 
     /**
@@ -41,7 +44,7 @@ public class TraceTrafficGenerator extends TrafficGenerator {
 		    DualModeEeeSimulator.printError("Trace file: invalid interarrival time!");
 		}
 	    } else {
-		arrival_time = DualModeEeeSimulator.simulation_length + 1;
+		arrival_time = Double.MAX_VALUE;
 	    }
 	} catch (IOException e) {
 	    DualModeEeeSimulator.printError("Error while reading trace file!");

@@ -36,7 +36,7 @@ public class FrameTransmissionEvent extends Event<EeeLink> {
     }
 
     /**
-     * Compares two packet transmission events.
+     * Compares two frame transmission events.
      *
      * @param obj the Object to be compared
      * @return true if the specified event is equal to this event
