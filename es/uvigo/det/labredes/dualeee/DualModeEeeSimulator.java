@@ -143,7 +143,7 @@ public final class DualModeEeeSimulator {
 			    field_offset = 1;
 			}
 		    }
-		    if (line_fields[3 + field_offset].matches("deterministic|uniform|trace")) {
+		    if (line_fields[3 + field_offset].matches("deterministic|uniform|bimodal|trace")) {
 			frame_size_distribution = line_fields[3 + field_offset];
 		    } else {
 			printError("Config file: invalid frame size distribution!");
@@ -242,6 +242,8 @@ public final class DualModeEeeSimulator {
             fsgen = new DeterministicFrameSizeGenerator(frame_size);
         } else if (frame_size_distribution.equals("uniform")) {
 	    fsgen = new UniformFrameSizeGenerator(frame_size, frame_size_range);
+	} else if (frame_size_distribution.equals("bimodal")) {
+	    fsgen = new BimodalFrameSizeGenerator(frame_size);
         } else if (frame_size_distribution.equals("trace")) {
 	    fsgen = new TraceFrameSizeGenerator(frame_size_file);
         }      
